@@ -234,4 +234,8 @@ class CliSuite extends SparkFunSuite with BeforeAndAfterAll with Logging {
         -> "Error in query: Table not found: nonexistent_table;"
     )
   }
+
+  test("Run command using Hive") {
+    runCliWithin(2.minute, Seq())("!echo \"test\";" -> "test")
+  }
 }
