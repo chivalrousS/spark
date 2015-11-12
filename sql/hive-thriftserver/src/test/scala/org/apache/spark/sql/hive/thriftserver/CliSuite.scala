@@ -236,6 +236,6 @@ class CliSuite extends SparkFunSuite with BeforeAndAfterAll with Logging {
   }
 
   test("Run command using Hive") {
-    runCliWithin(2.minute, Seq())("!echo \"test\";" -> "test")
+    runCliWithin(2.minute, Seq())("!echo test;" -> "test")
   }
 }

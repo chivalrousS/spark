@@ -24,6 +24,7 @@ import scala.collection.JavaConverters._
 import scala.language.reflectiveCalls
 
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.hive.cli.CliSessionState
 import org.apache.hadoop.hive.conf.HiveConf
 import org.apache.hadoop.hive.metastore.api.{Database, FieldSchema}
 import org.apache.hadoop.hive.metastore.{TableType => HTableType}
@@ -173,7 +174,9 @@ private[hive] class ClientWrapper(
 
     val ret = try {
       val registeredState = SessionState.get
-      if (registeredState == null) {
+      if (registeredState != null && registeredState.isInstanceOf[CliSessionState]) {
+        registeredState
+      } else {
         val initialConf = new HiveConf(classOf[SessionState])
         // HiveConf is a Hadoop Configuration, which has a field of classLoader and
         // the initial value will be the current thread's context class loader
@@ -197,8 +200,6 @@ private[hive] class ClientWrapper(
         state.out = new PrintStream(outputBuffer, true, "UTF-8")
         state.err = new PrintStream(outputBuffer, true, "UTF-8")
         state
-      } else {
-        registeredState
       }
     } finally {
       Thread.currentThread().setContextClassLoader(original)
