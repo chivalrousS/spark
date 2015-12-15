@@ -43,7 +43,7 @@ import org.apache.spark.annotation.Experimental
 import org.apache.spark.sql._
 import org.apache.spark.sql.SQLConf.SQLConfEntry
 import org.apache.spark.sql.SQLConf.SQLConfEntry._
-import org.apache.spark.sql.catalyst.{SqlParser, TableIdentifier, ParserDialect}
+import org.apache.spark.sql.catalyst.{DefaultParserDialect, SqlParser, TableIdentifier, ParserDialect}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.{ExecutedCommand, ExtractPythonUDFs, SetCommand}
@@ -412,22 +412,29 @@ class HiveContext(sc: SparkContext) extends SQLContext(sc) with Logging {
   override protected[sql] lazy val functionRegistry: FunctionRegistry =
     new HiveFunctionRegistry(FunctionRegistry.builtin)
 
-  /* An analyzer that uses the Hive metastore. */
-  @transient
-  override protected[sql] lazy val analyzer: Analyzer =
+  override protected def getAnalyzerInternal(parserDialect: ParserDialect): Analyzer =
     new Analyzer(catalog, functionRegistry, conf) {
-      override val extendedResolutionRules =
+      override val extendedResolutionRules = (
         catalog.ParquetConversions ::
         catalog.CreateTables ::
         catalog.PreInsertionCasts ::
         ExtractPythonUDFs ::
         ResolveHiveWindowFunction ::
         PreInsertCastAndRename ::
-        Nil
+        Nil) ++ parserDialect.parserExtendedAnalyzerRules
 
       override val extendedCheckRules = Seq(
         PreWriteCheck(catalog)
       )
+    }
+
+  /* An analyzer that uses the Hive metastore. */
+  @transient
+  override protected[sql] lazy val analyzer: Analyzer =
+    if (conf.extendedAnalyzerRules == "parser") {
+      getAnalyzerInternal(getSQLDialect())
+    } else {
+      getAnalyzerInternal(new DefaultParserDialect)
     }
 
   override protected[sql] def createSession(): SQLSession = {

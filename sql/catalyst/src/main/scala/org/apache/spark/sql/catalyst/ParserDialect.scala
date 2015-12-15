@@ -18,7 +18,9 @@
 package org.apache.spark.sql.catalyst
 
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.sql.catalyst.optimizer.{Optimizer, DefaultOptimizer}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.rules.Rule
 
 /**
  * Root class of SQL Parser Dialect, and we don't guarantee the binary
@@ -30,6 +32,10 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 abstract class ParserDialect {
   // this is the main function that will be implemented by sql parser.
   def parse(sqlText: String): LogicalPlan
+
+  def parserExtendedAnalyzerRules: Seq[Rule[LogicalPlan]] = Nil
+
+  def parserOptimizer: Optimizer = DefaultOptimizer
 }
 
 /**

@@ -417,6 +417,16 @@ private[spark] object SQLConf {
     defaultValue = Some(true),
     isPublic = false)
 
+  val EXTENDED_ANALYZER_RULES = stringConf(
+    "spark.sql.analyzer",
+    defaultValue = Some("default"),
+    doc = "Additional rules to use when analyze, set to `parser` to enable parser-specific rules")
+
+  val OPTIMIZER = stringConf(
+    "spark.sql.optimizer",
+    defaultValue = Some("default"),
+    doc = "Optimizer to use, set to `parser` to enable parser-specific optimizer")
+
   val USE_SQL_AGGREGATE2 = booleanConf("spark.sql.useAggregate2",
     defaultValue = Some(true), doc = "<TODO>")
 
@@ -526,6 +536,10 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
     getConf(DATAFRAME_SELF_JOIN_AUTO_RESOLVE_AMBIGUITY)
 
   private[spark] def dataFrameRetainGroupColumns: Boolean = getConf(DATAFRAME_RETAIN_GROUP_COLUMNS)
+
+  private[spark] def extendedAnalyzerRules: String = getConf(EXTENDED_ANALYZER_RULES)
+
+  private[spark] def optimizer: String = getConf(OPTIMIZER)
 
   /** ********************** SQLConf functionality methods ************ */
 

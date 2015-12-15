@@ -152,13 +152,11 @@ class SQLContext(@transient val sparkContext: SparkContext)
   @transient
   protected[sql] lazy val functionRegistry: FunctionRegistry = FunctionRegistry.builtin
 
-  @transient
-  protected[sql] lazy val analyzer: Analyzer =
+  protected def getAnalyzerInternal(parserDialect: ParserDialect): Analyzer =
     new Analyzer(catalog, functionRegistry, conf) {
       override val extendedResolutionRules =
-        ExtractPythonUDFs ::
-        PreInsertCastAndRename ::
-        Nil
+        (ExtractPythonUDFs ::
+        PreInsertCastAndRename :: Nil) ++ parserDialect.parserExtendedAnalyzerRules
 
       override val extendedCheckRules = Seq(
         datasources.PreWriteCheck(catalog)
@@ -166,7 +164,18 @@ class SQLContext(@transient val sparkContext: SparkContext)
     }
 
   @transient
-  protected[sql] lazy val optimizer: Optimizer = DefaultOptimizer
+  protected[sql] lazy val analyzer: Analyzer = if (conf.extendedAnalyzerRules == "parser") {
+    getAnalyzerInternal(getSQLDialect())
+  } else {
+    getAnalyzerInternal(new DefaultParserDialect)
+  }
+
+  @transient
+  protected[sql] lazy val optimizer: Optimizer = if (conf.optimizer == "parser") {
+    getSQLDialect().parserOptimizer
+  } else {
+    DefaultOptimizer
+  }
 
   @transient
   protected[sql] val ddlParser = new DDLParser(sqlParser.parse(_))
