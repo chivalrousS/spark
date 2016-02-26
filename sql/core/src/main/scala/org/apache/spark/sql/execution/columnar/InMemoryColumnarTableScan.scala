@@ -17,8 +17,15 @@
 
 package org.apache.spark.sql.execution.columnar
 
+import java.nio.ByteBuffer
+
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
+import org.apache.spark.unsafe.types.ByteArray
+
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.spark.network.util.JavaUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
@@ -51,7 +58,7 @@ private[sql] object InMemoryRelation {
  * @param stats The stat of columns
  */
 private[columnar]
-case class CachedBatch(numRows: Int, buffers: Array[Array[Byte]], stats: InternalRow)
+case class CachedBatch(numRows: Int, buffers: Array[MemoryBlock], stats: InternalRow)
 
 private[sql] case class InMemoryRelation(
     output: Seq[Attribute],
@@ -163,7 +170,9 @@ private[sql] case class InMemoryRelation(
                         .flatMap(_.values))
 
           batchStats += stats
-          CachedBatch(rowCount, columnBuilders.map(_.build().array()), stats)
+          CachedBatch(rowCount, columnBuilders.map {builder =>
+            bufferToMemoryBlock(builder.build())
+          }, stats)
         }
 
         def hasNext: Boolean = rowIterator.hasNext
@@ -172,6 +181,18 @@ private[sql] case class InMemoryRelation(
 
     cached.setName(tableName.map(n => s"In-memory table $n").getOrElse(child.toString))
     _cachedColumnBuffers = cached
+  }
+
+  private def bufferToMemoryBlock(buffer: ByteBuffer): MemoryBlock = {
+    val bytes = JavaUtils.bufferToArray(buffer)
+    if (!SQLContext.getActive().getOrElse(null).getConf("spark.memory.offHeap.enabled", "false")
+        .toBoolean) {
+        MemoryBlock.fromByteArray(bytes)
+    } else {
+      val block = MemoryAllocator.UNSAFE.allocate(buffer.remaining)
+      ByteArray.writeToMemory(bytes, block.getBaseObject, block.getBaseOffset);
+      block
+    }
   }
 
   def withOutput(newOutput: Seq[Attribute]): InMemoryRelation = {

@@ -90,13 +90,18 @@ object GenerateColumnAccessor extends CodeGenerator[Seq[DataType], ColumnarItera
       }
       ctx.addMutableState(accessorCls, accessorName, s"$accessorName = null;")
 
+      val prepare = s"""
+        MemoryBlock mb = buffers[$index];
+        byte[] buffer = new byte[mb.length];
+        Platform.copyMemory(mb.getBaseObject(), mb.getBaseOffset(), buffer, Platform
+          .BYTE_ARRAY_OFFSET, mb.length);"""
       val createCode = dt match {
         case t if ctx.isPrimitiveType(dt) =>
-          s"$accessorName = new $accessorCls(ByteBuffer.wrap(buffers[$index]).order(nativeOrder));"
+          s"$accessorName = new $accessorCls(ByteBuffer.wrap(buffer).order(nativeOrder));"
         case NullType | StringType | BinaryType =>
-          s"$accessorName = new $accessorCls(ByteBuffer.wrap(buffers[$index]).order(nativeOrder));"
+          s"$accessorName = new $accessorCls(ByteBuffer.wrap(buffer).order(nativeOrder));"
         case other =>
-          s"""$accessorName = new $accessorCls(ByteBuffer.wrap(buffers[$index]).order(nativeOrder),
+          s"""$accessorName = new $accessorCls(ByteBuffer.wrap(buffer).order(nativeOrder),
              (${dt.getClass.getName}) columnTypes[$index]);"""
       }
 
@@ -111,7 +116,7 @@ object GenerateColumnAccessor extends CodeGenerator[Seq[DataType], ColumnarItera
            """
         case other => ""
       }
-      (createCode, extract + patch)
+      (prepare + createCode, extract + patch)
     }.unzip
 
     val code = s"""
@@ -122,6 +127,8 @@ object GenerateColumnAccessor extends CodeGenerator[Seq[DataType], ColumnarItera
       import org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder;
       import org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter;
       import org.apache.spark.sql.execution.columnar.MutableUnsafeRow;
+      import org.apache.spark.unsafe.memory.MemoryBlock;
+      import org.apache.spark.unsafe.Platform;
 
       public SpecificColumnarIterator generate($exprType[] expr) {
         return new SpecificColumnarIterator();
@@ -130,7 +137,7 @@ object GenerateColumnAccessor extends CodeGenerator[Seq[DataType], ColumnarItera
       class SpecificColumnarIterator extends ${classOf[ColumnarIterator].getName} {
 
         private ByteOrder nativeOrder = null;
-        private byte[][] buffers = null;
+        private MemoryBlock[] buffers = null;
         private UnsafeRow unsafeRow = new UnsafeRow();
         private BufferHolder bufferHolder = new BufferHolder();
         private UnsafeRowWriter rowWriter = new UnsafeRowWriter();
@@ -147,7 +154,7 @@ object GenerateColumnAccessor extends CodeGenerator[Seq[DataType], ColumnarItera
 
         public SpecificColumnarIterator() {
           this.nativeOrder = ByteOrder.nativeOrder();
-          this.buffers = new byte[${columnTypes.length}][];
+          this.buffers = new MemoryBlock[${columnTypes.length}];
           this.mutableRow = new MutableUnsafeRow(rowWriter);
 
           ${initMutableStates(ctx)}
