@@ -91,17 +91,18 @@ object GenerateColumnAccessor extends CodeGenerator[Seq[DataType], ColumnarItera
       ctx.addMutableState(accessorCls, accessorName, s"$accessorName = null;")
 
       val prepare = s"""
-        MemoryBlock mb = buffers[$index];
-        byte[] buffer = new byte[mb.length];
-        Platform.copyMemory(mb.getBaseObject(), mb.getBaseOffset(), buffer, Platform
-          .BYTE_ARRAY_OFFSET, mb.length);"""
+        MemoryBlock mb$index = buffers[$index];
+        byte[] buffer$index = new byte[(int) mb$index.size()];
+        Platform.copyMemory(mb$index.getBaseObject(), mb$index.getBaseOffset(), buffer$index,
+          Platform.BYTE_ARRAY_OFFSET, mb$index.size());
+        """
       val createCode = dt match {
         case t if ctx.isPrimitiveType(dt) =>
-          s"$accessorName = new $accessorCls(ByteBuffer.wrap(buffer).order(nativeOrder));"
+          s"$accessorName = new $accessorCls(ByteBuffer.wrap(buffer$index).order(nativeOrder));"
         case NullType | StringType | BinaryType =>
-          s"$accessorName = new $accessorCls(ByteBuffer.wrap(buffer).order(nativeOrder));"
+          s"$accessorName = new $accessorCls(ByteBuffer.wrap(buffer$index).order(nativeOrder));"
         case other =>
-          s"""$accessorName = new $accessorCls(ByteBuffer.wrap(buffer).order(nativeOrder),
+          s"""$accessorName = new $accessorCls(ByteBuffer.wrap(buffer$index).order(nativeOrder),
              (${dt.getClass.getName}) columnTypes[$index]);"""
       }
 

@@ -185,8 +185,7 @@ private[sql] case class InMemoryRelation(
 
   private def bufferToMemoryBlock(buffer: ByteBuffer): MemoryBlock = {
     val bytes = JavaUtils.bufferToArray(buffer)
-    if (!SQLContext.getActive().getOrElse(null).getConf("spark.memory.offHeap.enabled", "false")
-        .toBoolean) {
+    if (false) {
         MemoryBlock.fromByteArray(bytes)
     } else {
       val block = MemoryAllocator.UNSAFE.allocate(buffer.remaining)
