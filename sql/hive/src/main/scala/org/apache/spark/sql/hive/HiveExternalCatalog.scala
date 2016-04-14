@@ -96,6 +96,14 @@ private[spark] class HiveExternalCatalog(client: HiveClient) extends ExternalCat
       db: String,
       ignoreIfNotExists: Boolean,
       cascade: Boolean): Unit = withClient {
+    // Unregister the functions as well.
+    // Note: This is a bug for Hive's API design, so we only do this explicit dropping for
+    // HiveExternalCatalog only. See HIVE-12304.
+    if (cascade) {
+      client.listFunctions(db, "*").foreach {
+        case functionName => client.dropFunction(db, functionName)
+      }
+    }
     client.dropDatabase(db, ignoreIfNotExists, cascade)
   }
 

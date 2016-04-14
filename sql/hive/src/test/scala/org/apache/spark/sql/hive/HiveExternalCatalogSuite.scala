@@ -17,20 +17,22 @@
 
 package org.apache.spark.sql.hive
 
+import java.io.File
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.util.VersionInfo
 
 import org.apache.spark.SparkConf
+import org.apache.spark.sql.catalyst.FunctionIdentifier
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.hive.client.{HiveClient, IsolatedClientLoader}
-import org.apache.spark.util.Utils
 
 /**
  * Test suite for the [[HiveExternalCatalog]].
  */
 class HiveExternalCatalogSuite extends CatalogTestCases {
 
-  private val client: HiveClient = {
+  private lazy val client: HiveClient = {
     IsolatedClientLoader.forVersion(
       hiveMetastoreVersion = HiveContext.hiveExecutionVersion,
       hadoopVersion = VersionInfo.getVersion,
@@ -46,4 +48,23 @@ class HiveExternalCatalogSuite extends CatalogTestCases {
 
   protected override def resetState(): Unit = client.reset()
 
+  import utils._
+
+  test("drop database cascade with function defined") {
+    import org.apache.spark.sql.catalyst.expressions.Lower
+
+    val catalog = newEmptyCatalog()
+    val dbName = "dbCascade"
+    val path = newUriForDatabase()
+    catalog.createDatabase(CatalogDatabase(dbName, "", path, Map.empty), ignoreIfExists = false)
+    // create a permanent function in catalog
+    catalog.createFunction(dbName, CatalogFunction(
+      FunctionIdentifier("func1", Some(dbName)), Lower.getClass.getName, Nil))
+    assert(catalog.functionExists(dbName, "func1"))
+    catalog.dropDatabase(dbName, ignoreIfNotExists = false, cascade = true)
+    // create the db again because `functionExists` requires db to exist
+    catalog.createDatabase(CatalogDatabase(dbName, "", path, Map.empty), ignoreIfExists = false)
+    assert(!catalog.functionExists(dbName, "func1"))
+    catalog.dropDatabase(dbName, ignoreIfNotExists = true, cascade = true)
+  }
 }
