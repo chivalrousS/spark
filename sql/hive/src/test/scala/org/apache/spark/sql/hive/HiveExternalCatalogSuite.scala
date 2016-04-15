@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.hive
 
-import java.io.File
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.util.VersionInfo
 
@@ -59,7 +57,7 @@ class HiveExternalCatalogSuite extends CatalogTestCases {
     catalog.createDatabase(CatalogDatabase(dbName, "", path, Map.empty), ignoreIfExists = false)
     // create a permanent function in catalog
     catalog.createFunction(dbName, CatalogFunction(
-      FunctionIdentifier("func1", Some(dbName)), Lower.getClass.getName, Nil))
+      FunctionIdentifier("func1", Some(dbName)), classOf[Lower].getName, Nil))
     assert(catalog.functionExists(dbName, "func1"))
     catalog.dropDatabase(dbName, ignoreIfNotExists = false, cascade = true)
     // create the db again because `functionExists` requires db to exist
